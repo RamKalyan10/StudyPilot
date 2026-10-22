@@ -1,0 +1,8 @@
+import {Router} from 'express';import Schedule from '../models/Schedule.js';import Task from '../models/Task.js';import Subject from '../models/Subject.js';import Availability from '../models/Availability.js';import User from '../models/User.js';import auth from '../middleware/auth.js';import asyncHandler from '../utils/asyncHandler.js';import {generateSchedule} from '../services/scheduler.js';
+const r=Router();r.use(auth);
+async function build(req,reason){const [tasks,availability,user,last]=await Promise.all([Task.find({user:req.user._id,status:{$ne:'completed'}}).populate('subject','name'),Availability.find({user:req.user._id,end:{$gt:new Date()}}).sort('start'),User.findById(req.user._id),Schedule.findOne({user:req.user._id}).sort({version:-1})]);const result=generateSchedule({tasks,availability,dailyLimitMinutes:user.preferences.dailyLimitMinutes,preferredSessionMinutes:user.preferences.preferredSessionMinutes});const schedule=await Schedule.create({user:req.user._id,version:(last?.version||0)+1,reason,...result});return schedule;}
+r.post('/generate',asyncHandler(async(req,res)=>{const s=await build(req,'initial');res.status(201).json(s)}));
+r.post('/reschedule',asyncHandler(async(req,res)=>{const s=await build(req,req.body.reason||'adaptive recovery');res.status(201).json(s)}));
+r.get('/latest',asyncHandler(async(req,res)=>{const s=await Schedule.findOne({user:req.user._id}).sort({version:-1});if(!s)return res.json(null);res.json(s)}));
+r.get('/',asyncHandler(async(req,res)=>res.json(await Schedule.find({user:req.user._id}).sort({version:-1}).limit(20))));
+export default r;
