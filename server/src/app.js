@@ -55,7 +55,7 @@ if (!process.env.JWT_SECRET) console.warn('WARNING: JWT_SECRET is not set. Confi
 try {
   await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/studypilot');
   console.log('MongoDB connected');
-  app.listen(port, () => console.log(`StudyPilot API running on http://localhost:${port}`));
+  app.listen(port, '0.0.0.0', () => console.log(`StudyPilot API running on port ${port}`));
 } catch (err) {
   console.error('Could not connect to MongoDB:', err.message);
   process.exit(1);
