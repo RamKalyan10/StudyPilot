@@ -1,0 +1,10 @@
+{
+  "name": "studypilot-root",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "cd server && npm install",
+    "start": "cd server && npm start"
+  }
+}
