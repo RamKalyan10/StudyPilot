@@ -12,6 +12,8 @@ import sessionRoutes from './routes/sessions.js';
 import analyticsRoutes from './routes/analytics.js';
 import syllabusRoutes from './routes/syllabus.js';
 
+const app = express();
+
 const allowedOrigins = process.env.CLIENT_ORIGIN
   ? process.env.CLIENT_ORIGIN.split(',').map((o) => o.trim())
   : ['http://localhost:5173', 'http://localhost:3000'];
