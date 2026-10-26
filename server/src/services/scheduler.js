@@ -49,7 +49,7 @@ export function generateSchedule({ tasks, availability, dailyLimitMinutes = 180,
       if (usableEnd <= freeStart) continue;
 
       const dateKey = getLocalDateKey(freeStart);
-      const dailyUsed = dayMinutes.get(dateKey) || 0;
+
 
       // Fit into gaps between previously booked sessions in this window
       for (const booked of used.filter(b => b.start < usableEnd && b.end > freeStart).sort((a,b)=>a.start-b.start)) {

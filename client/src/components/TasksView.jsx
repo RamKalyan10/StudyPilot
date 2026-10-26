@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   CheckCircle2,
   Clock3,
@@ -12,9 +12,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Check,
-  AlertCircle,
-  BookOpen,
-  ArrowUpRight
+  BookOpen
 } from 'lucide-react';
 
 export default function TasksView({

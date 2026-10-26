@@ -1,12 +1,9 @@
-import React from 'react';
 import {
-  TrendingUp,
   CheckCircle2,
   Clock3,
   CalendarDays,
   Target,
   BookOpen,
-  PieChart,
   Activity
 } from 'lucide-react';
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Play,
   Pause,
@@ -7,10 +7,7 @@ import {
   X,
   Maximize2,
   Minimize2,
-  Target,
-  Clock,
-  Sparkles,
-  BookOpen
+  Target
 } from 'lucide-react';
 
 export default function StudyTimer({

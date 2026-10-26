@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   BookOpen,
-  FileText,
   Upload,
   Check,
-  CheckCircle2,
   X,
   Sparkles,
   Layers,
@@ -12,9 +10,7 @@ import {
   Target,
   Trash2,
   Plus,
-  ArrowRight,
   AlertCircle,
-  Copy,
   Loader2,
   FileCheck
 } from 'lucide-react';

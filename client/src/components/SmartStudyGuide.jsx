@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Clock3,
-  CheckCircle2,
   CalendarDays,
   Plus,
   RefreshCw,
   Sparkles,
-  ArrowRight,
   ChevronDown,
   ChevronUp,
   FileText,
