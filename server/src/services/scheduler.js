@@ -20,7 +20,10 @@ function splitWindow(start, end, maxSessionMinutes) {
 }
 
 export function generateSchedule({ tasks, availability, dailyLimitMinutes = 180, preferredSessionMinutes = 50, now = new Date() }) {
-  const windows = availability.map(a => ({ start: new Date(a.start), end: new Date(a.end) })).filter(w => w.end > now && w.end > w.start).sort((a,b) => a.start-b.start);
+  const windows = availability
+    .map(a => ({ start: new Date(a.start), end: new Date(a.end) }))
+    .filter(w => w.end > now && w.end > w.start)
+    .sort((a,b) => a.start - b.start);
   const dayMinutes = new Map();
   const used = [];
   const sessions = [];
@@ -29,6 +32,12 @@ export function generateSchedule({ tasks, availability, dailyLimitMinutes = 180,
     .map(t => ({ task: t, score: priorityScore(t, now), remaining: Number(t.remainingMinutes ?? t.estimatedMinutes) }))
     .sort((a,b) => (new Date(a.task.deadline)-new Date(b.task.deadline)) || (b.score-a.score));
   let totalRequestedMinutes = ordered.reduce((sum, x) => sum + x.remaining, 0);
+
+  const getLocalDateKey = (d) => {
+    const dt = new Date(d);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  };
+
   for (const item of ordered) {
     let remaining = item.remaining;
     const deadline = new Date(item.task.deadline);
@@ -36,31 +45,53 @@ export function generateSchedule({ tasks, availability, dailyLimitMinutes = 180,
       if (remaining <= 0) break;
       if (window.start >= deadline) continue;
       const usableEnd = new Date(Math.min(window.end.getTime(), deadline.getTime()));
-      if (usableEnd <= window.start) continue;
-      const dateKey = window.start.toISOString().slice(0,10);
+      let freeStart = new Date(Math.max(window.start.getTime(), now.getTime()));
+      if (usableEnd <= freeStart) continue;
+
+      const dateKey = getLocalDateKey(freeStart);
       const dailyUsed = dayMinutes.get(dateKey) || 0;
-      let freeStart = new Date(window.start);
+
+      // Fit into gaps between previously booked sessions in this window
       for (const booked of used.filter(b => b.start < usableEnd && b.end > freeStart).sort((a,b)=>a.start-b.start)) {
         if (booked.start > freeStart) {
-          const capacity = Math.max(0, Math.floor((booked.start-freeStart)/60000));
-          const allowed = Math.min(capacity, dailyLimitMinutes-dailyUsed, remaining, preferredSessionMinutes);
+          const capacity = Math.max(0, Math.floor((booked.start - freeStart) / 60000));
+          const currentDailyUsed = dayMinutes.get(dateKey) || 0;
+          const maxAllowed = Math.min(capacity, dailyLimitMinutes - currentDailyUsed, remaining);
+          const allowed = remaining <= preferredSessionMinutes + 15 && capacity >= remaining
+            ? Math.min(remaining, dailyLimitMinutes - currentDailyUsed)
+            : Math.min(maxAllowed, preferredSessionMinutes);
+
           if (allowed >= 15) {
-            const end = new Date(freeStart.getTime()+allowed*60000);
-            sessions.push(makeSession(item.task, freeStart, end, allowed)); used.push({start:freeStart,end});
-            remaining -= allowed; dayMinutes.set(dateKey, (dayMinutes.get(dateKey)||0)+allowed);
+            const end = new Date(freeStart.getTime() + allowed * 60000);
+            sessions.push(makeSession(item.task, freeStart, end, allowed));
+            used.push({ start: freeStart, end });
+            remaining -= allowed;
+            dayMinutes.set(dateKey, (dayMinutes.get(dateKey) || 0) + allowed);
+            freeStart = new Date(end.getTime() + 5 * 60000);
           }
         }
         if (booked.end > freeStart) freeStart = new Date(booked.end);
       }
-      if (remaining > 0 && freeStart < usableEnd) {
-        const capacity = Math.max(0, Math.floor((usableEnd-freeStart)/60000));
-        const dayLeft = dailyLimitMinutes-(dayMinutes.get(dateKey)||0);
-        const allowed = Math.min(capacity, dayLeft, remaining, preferredSessionMinutes);
-        if (allowed >= 15) {
-          const end = new Date(freeStart.getTime()+allowed*60000);
-          sessions.push(makeSession(item.task, freeStart, end, allowed)); used.push({start:freeStart,end});
-          remaining -= allowed; dayMinutes.set(dateKey, (dayMinutes.get(dateKey)||0)+allowed);
-        }
+
+      // Fit into remaining capacity up to usableEnd
+      while (remaining >= 15 && freeStart < usableEnd) {
+        const capacity = Math.max(0, Math.floor((usableEnd - freeStart) / 60000));
+        const currentDailyUsed = dayMinutes.get(dateKey) || 0;
+        const dayLeft = dailyLimitMinutes - currentDailyUsed;
+        const maxAllowed = Math.min(capacity, dayLeft, remaining);
+        const allowed = remaining <= preferredSessionMinutes + 15 && capacity >= remaining
+          ? Math.min(remaining, dayLeft)
+          : Math.min(maxAllowed, preferredSessionMinutes);
+
+        if (allowed < 15) break;
+
+        const end = new Date(freeStart.getTime() + allowed * 60000);
+        sessions.push(makeSession(item.task, freeStart, end, allowed));
+        used.push({ start: freeStart, end });
+        remaining -= allowed;
+        dayMinutes.set(dateKey, (dayMinutes.get(dateKey) || 0) + allowed);
+        // 5-minute breather before the next session
+        freeStart = new Date(end.getTime() + 5 * 60000);
       }
     }
     if (remaining > 0) unscheduled.push({ task: item.task._id, title: item.task.title, remainingMinutes: remaining, reason: deadline <= now ? 'Deadline has passed' : 'Not enough available time before the deadline or daily limit' });

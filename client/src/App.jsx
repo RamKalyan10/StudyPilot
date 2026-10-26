@@ -34,6 +34,7 @@ import TasksView from './components/TasksView';
 import AvailabilityView from './components/AvailabilityView';
 import SubjectsView from './components/SubjectsView';
 import InsightsView from './components/InsightsView';
+import SmartStudyGuide from './components/SmartStudyGuide';
 import SyllabusModal, { SAMPLE_DSA_SYLLABUS, SAMPLE_DBMS_SYLLABUS } from './components/SyllabusModal';
 import { extractDocumentText } from './utils/docExtractor';
 
@@ -459,7 +460,20 @@ export default function App() {
       });
       setModal('');
       setTaskForm((f) => ({ ...f, title: '', notes: '' }));
-    }, 'Task added to your study backlog');
+
+      // If user has availability configured, auto-generate schedule into the open windows!
+      if (availability.length > 0) {
+        try {
+          const sc = await api('/schedules/generate', {
+            method: 'POST',
+            body: JSON.stringify({ reason: 'auto-schedule new task' })
+          });
+          setSchedule(sc);
+        } catch (err) {
+          console.warn('Auto schedule generation on task add:', err);
+        }
+      }
+    }, availability.length > 0 ? 'Task added & scheduled in your available window!' : 'Task added! Next step: add your available study window.');
   }
 
   async function updateTask(id, patch) {
@@ -489,7 +503,20 @@ export default function App() {
         })
       });
       setModal('');
-    }, 'Study window saved');
+
+      // If user already has tasks queued, auto-schedule them into this new window!
+      if (tasks.length > 0) {
+        try {
+          const sc = await api('/schedules/generate', {
+            method: 'POST',
+            body: JSON.stringify({ reason: 'auto-schedule into new window' })
+          });
+          setSchedule(sc);
+        } catch (err) {
+          console.warn('Auto schedule generation on avail add:', err);
+        }
+      }
+    }, tasks.length > 0 ? 'Study window saved & schedule updated!' : 'Study window saved! Next step: add your study tasks.');
   }
 
   async function addPresetAvailability({ start, end, label }) {
@@ -502,7 +529,19 @@ export default function App() {
           end: end.toISOString()
         })
       });
-    }, `Added ${label}`);
+
+      if (tasks.length > 0) {
+        try {
+          const sc = await api('/schedules/generate', {
+            method: 'POST',
+            body: JSON.stringify({ reason: 'auto-schedule into preset window' })
+          });
+          setSchedule(sc);
+        } catch (err) {
+          console.warn('Auto schedule generation on preset avail:', err);
+        }
+      }
+    }, tasks.length > 0 ? `Added ${label} & synced schedule!` : `Added ${label}! Next step: add your study tasks.`);
   }
 
   async function deleteAvailability(id) {
@@ -818,6 +857,23 @@ export default function App() {
                 <X size={16} />
               </button>
             </div>
+          )}
+
+          {/* Smart Onboarding & Adaptive Study Assistant Banner */}
+          {(page === 'Overview' || page === 'Schedule' || page === 'Availability') && (
+            <SmartStudyGuide
+              availability={availability}
+              tasks={tasks}
+              schedule={schedule}
+              upcomingSessions={upcoming}
+              onOpenAvailabilityModal={() => setModal('availability')}
+              onOpenTaskModal={() => setModal('task')}
+              onOpenSyllabusModal={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
+              onGenerateSchedule={() => generate(false)}
+              onNavigate={(targetPage) => setPage(targetPage)}
+              onAddPresetAvailability={addPresetAvailability}
+              busy={busy}
+            />
           )}
 
           {/* PAGE: OVERVIEW */}
@@ -1151,11 +1207,12 @@ export default function App() {
           {page === 'Schedule' && (
             <CalendarView
               schedule={schedule}
+              availability={availability}
               subjects={subjects}
               onAction={sessionAction}
               onGenerate={generate}
               onOpenTimer={(session) => setActiveTimerSession(session)}
-              onSetAvailability={() => setPage('Availability')}
+              onSetAvailability={() => setModal('availability')}
               onAddTask={() => setModal('task')}
               busy={busy}
             />

@@ -15,8 +15,18 @@ import {
   BookOpen
 } from 'lucide-react';
 
+export const getLocalDateKey = (d) => {
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function CalendarView({
   schedule,
+  availability = [],
   subjects = [],
   onAction,
   onGenerate,
@@ -100,11 +110,11 @@ export default function CalendarView({
     });
   }, [schedule, subjectFilter, statusFilter, searchQuery]);
 
-  // Map of sessions keyed by 'YYYY-MM-DD'
+  // Map of sessions keyed by local 'YYYY-MM-DD'
   const sessionsByDate = useMemo(() => {
     const map = new Map();
     filteredSessions.forEach((s) => {
-      const key = new Date(s.start).toISOString().slice(0, 10);
+      const key = getLocalDateKey(s.start);
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(s);
     });
@@ -112,6 +122,18 @@ export default function CalendarView({
     map.forEach((list) => list.sort((a, b) => new Date(a.start) - new Date(b.start)));
     return map;
   }, [filteredSessions]);
+
+  // Map of availability windows keyed by local 'YYYY-MM-DD'
+  const availabilityByDate = useMemo(() => {
+    const map = new Map();
+    (availability || []).forEach((a) => {
+      const key = getLocalDateKey(a.start);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(a);
+    });
+    map.forEach((list) => list.sort((a, b) => new Date(a.start) - new Date(b.start)));
+    return map;
+  }, [availability]);
 
   // Navigation handlers
   const handlePrev = () => {
@@ -186,6 +208,24 @@ export default function CalendarView({
             </button>
           </div>
           <h2 className="cal-range-title">{rangeLabel}</h2>
+          <div className="cal-header-quick-actions">
+            <button
+              className="cal-quick-action-btn"
+              onClick={onSetAvailability}
+              title="Add study availability window"
+            >
+              <Clock size={13} />
+              <span>+ Window</span>
+            </button>
+            <button
+              className="cal-quick-action-btn primary"
+              onClick={onAddTask}
+              title="Add a new task"
+            >
+              <Plus size={13} />
+              <span>+ Task</span>
+            </button>
+          </div>
         </div>
 
         <div className="cal-controls-right">
@@ -267,14 +307,15 @@ export default function CalendarView({
       {viewMode === 'week' && (
         <div className="cal-week-grid">
           {weekDays.map((day) => {
-            const dateKey = day.toISOString().slice(0, 10);
+            const dateKey = getLocalDateKey(day);
             const sessions = sessionsByDate.get(dateKey) || [];
+            const dayAvail = availabilityByDate.get(dateKey) || [];
             const dayIsToday = isToday(day);
 
             return (
               <div
                 key={dateKey}
-                className={`cal-day-col ${dayIsToday ? 'today' : ''}`}
+                className={`cal-day-col ${dayIsToday ? 'today' : ''} ${dayAvail.length > 0 ? 'has-window' : ''}`}
               >
                 {/* Day Header */}
                 <div className="cal-day-header">
@@ -284,19 +325,64 @@ export default function CalendarView({
                   <div className={`cal-day-number ${dayIsToday ? 'active-today' : ''}`}>
                     {day.getDate()}
                   </div>
-                  {sessions.length > 0 && (
-                    <span className="cal-day-badge">
-                      {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
-                    </span>
-                  )}
+                  <div className="cal-day-badges-row">
+                    {dayAvail.length > 0 && (
+                      <span className="cal-day-window-chip" title={`${dayAvail.length} active study window(s)`}>
+                        <Clock size={9} /> Window
+                      </span>
+                    )}
+                    {sessions.length > 0 && (
+                      <span className="cal-day-badge">
+                        {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Configured Availability Windows for this day */}
+                {dayAvail.length > 0 && (
+                  <div className="cal-day-windows-strip">
+                    {dayAvail.map((av) => (
+                      <div
+                        key={av._id}
+                        className="cal-day-window-badge"
+                        title={`${av.label || 'Available Study Window'}: ${fmtTime(av.start)} – ${fmtTime(av.end)}`}
+                      >
+                        <div className="cal-day-window-info">
+                          <Clock size={10} className="window-icon" />
+                          <span className="cal-day-window-time">
+                            {fmtTime(av.start)} – {fmtTime(av.end)}
+                          </span>
+                        </div>
+                        <span className="cal-day-window-label">
+                          {av.label || 'Study Time'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Day Sessions Container */}
                 <div className="cal-day-content">
                   {sessions.length === 0 ? (
-                    <div className="cal-day-empty">
-                      <span>Free Day</span>
-                    </div>
+                    dayAvail.length > 0 ? (
+                      <div className="cal-day-empty has-avail">
+                        <Clock size={20} className="empty-icon text-brand" />
+                        <span className="empty-title">Window Open</span>
+                        <span className="empty-sub">Add tasks to schedule sessions here</span>
+                        <button className="cal-day-quick-btn" onClick={onAddTask}>
+                          <Plus size={12} /> Add Task
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="cal-day-empty">
+                        <span className="empty-title">Free Day</span>
+                        <span className="empty-sub">No study window set</span>
+                        <button className="cal-day-quick-btn secondary" onClick={onSetAvailability}>
+                          <Plus size={12} /> Add Window
+                        </button>
+                      </div>
+                    )
                   ) : (
                     sessions.map((session) => {
                       const color = getSubjectColor(session.subjectName);
@@ -310,12 +396,13 @@ export default function CalendarView({
                             <span
                               className="cal-subject-chip"
                               style={{ borderColor: `${color}55`, color }}
+                              title={session.subjectName || 'Study'}
                             >
                               <span
                                 className="cal-subject-dot"
                                 style={{ background: color }}
                               />
-                              {session.subjectName || 'Study'}
+                              <span className="chip-text">{session.subjectName || 'Study'}</span>
                             </span>
                             <span className={`cal-status-pill ${session.status}`}>
                               {session.status}
@@ -328,7 +415,7 @@ export default function CalendarView({
 
                           <div className="cal-session-meta">
                             <span className="cal-time-range">
-                              <Clock size={12} />
+                              <Clock size={11} />
                               {fmtTime(session.start)} – {fmtTime(session.end)}
                             </span>
                             <span className="cal-duration-pill">
@@ -345,7 +432,7 @@ export default function CalendarView({
                                   onClick={() => onAction(session._id, 'start')}
                                   title="Start Session"
                                 >
-                                  <Play size={13} />
+                                  <Play size={12} />
                                   <span>Start</span>
                                 </button>
                                 <button
@@ -353,7 +440,7 @@ export default function CalendarView({
                                   onClick={() => onOpenTimer(session)}
                                   title="Launch Focus Timer"
                                 >
-                                  <Target size={13} />
+                                  <Target size={12} />
                                   <span>Timer</span>
                                 </button>
                                 <button
@@ -361,14 +448,14 @@ export default function CalendarView({
                                   onClick={() => onAction(session._id, 'complete')}
                                   title="Mark Completed"
                                 >
-                                  <Check size={13} />
+                                  <Check size={12} />
                                 </button>
                                 <button
                                   className="cal-action-btn miss"
                                   onClick={() => onAction(session._id, 'miss')}
                                   title="Mark Missed & Auto-Reschedule"
                                 >
-                                  <X size={13} />
+                                  <X size={12} />
                                 </button>
                               </>
                             )}
@@ -380,7 +467,7 @@ export default function CalendarView({
                                   onClick={() => onOpenTimer(session)}
                                   title="Resume Focus Timer"
                                 >
-                                  <Target size={13} />
+                                  <Target size={12} />
                                   <span>Focus Now</span>
                                 </button>
                                 <button
@@ -388,7 +475,7 @@ export default function CalendarView({
                                   onClick={() => onAction(session._id, 'complete')}
                                   title="Finish Session"
                                 >
-                                  <Check size={13} />
+                                  <Check size={12} />
                                   <span>Finish</span>
                                 </button>
                               </>
@@ -396,7 +483,7 @@ export default function CalendarView({
 
                             {session.status === 'completed' && (
                               <div className="cal-completed-tag">
-                                <Check size={13} /> Logged {session.actualMinutes || session.plannedMinutes}m
+                                <Check size={12} /> Logged {session.actualMinutes || session.plannedMinutes}m
                               </div>
                             )}
 
@@ -428,8 +515,9 @@ export default function CalendarView({
 
           <div className="cal-month-grid">
             {currentMonthDays.map(({ date, isCurrentMonth }, idx) => {
-              const dateKey = date.toISOString().slice(0, 10);
+              const dateKey = getLocalDateKey(date);
               const sessions = sessionsByDate.get(dateKey) || [];
+              const dayAvail = availabilityByDate.get(dateKey) || [];
               const dayIsToday = isToday(date);
               const isSelected = selectedDaySessions?.dateKey === dateKey;
 
@@ -453,9 +541,14 @@ export default function CalendarView({
                     >
                       {date.getDate()}
                     </span>
-                    {sessions.length > 0 && (
-                      <span className="cal-month-count">{sessions.length}</span>
-                    )}
+                    <div className="cal-month-cell-badges">
+                      {dayAvail.length > 0 && (
+                        <span className="cal-month-avail-dot" title={`${dayAvail.length} study window(s)`} />
+                      )}
+                      {sessions.length > 0 && (
+                        <span className="cal-month-count">{sessions.length}</span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="cal-month-dots">
