@@ -174,6 +174,8 @@ function AuthScreen({ onAuth, theme = 'dark', onToggleTheme }) {
       console.error('Firebase Google Sign-In error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
         setError('Google sign-in popup was closed before completion.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError(`Unauthorized domain: Please add '${window.location.hostname}' to Authorized Domains in your Firebase Console (Authentication > Settings > Authorized domains).`);
       } else {
         setError(err.message || 'Google sign-in failed.');
       }
