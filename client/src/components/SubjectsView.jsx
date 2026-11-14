@@ -1,3 +1,10 @@
+/**
+ * @file SubjectsView.jsx
+ * @description Academic Subjects & Course Management Dashboard.
+ * Displays enrolled courses with color-coding, associated tasks count, completion progress bars,
+ * syllabus upload shortcuts, and subject deletion.
+ */
+
 import { useState, useMemo } from 'react';
 import {
   BookOpen,
@@ -15,6 +22,17 @@ import {
   ListTodo
 } from 'lucide-react';
 
+/**
+ * @param {Object} props
+ * @param {Array<Object>} props.subjects - Enrolled courses
+ * @param {Array<Object>} props.tasks - All student tasks
+ * @param {Array<Object>} props.syllabi - Uploaded course syllabi
+ * @param {Function} props.onOpenAddModal - Open create subject modal
+ * @param {Function} props.onOpenSyllabusModal - Open syllabus parser modal
+ * @param {Function} props.onDeleteSubject - Delete subject callback
+ * @param {Function} props.onSelectSubjectFilter - Apply subject filter to tasks view
+ * @param {Function} props.onAddTaskForSubject - Open task modal pre-populated with subject
+ */
 export default function SubjectsView({
   subjects = [],
   tasks = [],

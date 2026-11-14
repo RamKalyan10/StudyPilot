@@ -1,3 +1,10 @@
+/**
+ * @file InsightsView.jsx
+ * @description Student Study Analytics & Performance Dashboard.
+ * Visualizes completion rate, total study time, planned workload feasibility,
+ * and subject-by-subject progress breakdown.
+ */
+
 import {
   CheckCircle2,
   Clock3,
@@ -7,6 +14,10 @@ import {
   Activity
 } from 'lucide-react';
 
+/**
+ * @param {Object} props
+ * @param {Object} props.analytics - Aggregated student study metrics from /api/analytics/progress
+ */
 export default function InsightsView({ analytics }) {
   const minutesLabel = (m) => {
     if (!m) return '0m';

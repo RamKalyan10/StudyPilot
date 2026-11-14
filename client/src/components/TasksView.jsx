@@ -1,3 +1,10 @@
+/**
+ * @file TasksView.jsx
+ * @description Task Management Kanban Board & List View.
+ * Provides interactive Kanban lanes (Pending, In Progress, Completed), search,
+ * subject filtering, priority-level filtering, task creation, and state updates.
+ */
+
 import { useState, useMemo } from 'react';
 import {
   CheckCircle2,
@@ -15,6 +22,14 @@ import {
   BookOpen
 } from 'lucide-react';
 
+/**
+ * @param {Object} props
+ * @param {Array<Object>} props.tasks - Student study tasks enriched with priorityScore
+ * @param {Array<Object>} props.subjects - Enrolled courses
+ * @param {Function} props.onAddTask - Open add task modal callback
+ * @param {Function} props.onUpdateTask - Update task callback (status change, etc.)
+ * @param {Function} props.onDeleteTask - Delete task callback
+ */
 export default function TasksView({
   tasks = [],
   subjects = [],

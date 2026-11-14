@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+/**
+ * @file App.jsx
+ * @description Main Application Controller & View Orchestrator for StudyPilot.
+ * Manages global student state: authentication, subjects, tasks, availability windows,
+ * schedules, sessions, modals (add task, add subject, add availability, syllabus parser),
+ * focus timer state, theme toggling, and dashboard tab navigation.
+ */
+
+import { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Compass,
   LayoutDashboard,
@@ -25,7 +33,13 @@ import {
   FileText,
   Upload,
   Loader2,
-  FileCheck
+  FileCheck,
+  Mail,
+  KeyRound,
+  Lock,
+  RefreshCcw,
+  CheckCircle,
+  ExternalLink
 } from 'lucide-react';
 import { api, getToken, setToken } from './api';
 import CalendarView from './components/CalendarView';
@@ -37,7 +51,20 @@ import InsightsView from './components/InsightsView';
 import SmartStudyGuide from './components/SmartStudyGuide';
 import SyllabusModal, { SAMPLE_DSA_SYLLABUS, SAMPLE_DBMS_SYLLABUS } from './components/SyllabusModal';
 import { extractDocumentText } from './utils/docExtractor';
+import {
+  signInWithGoogle,
+  registerWithEmail,
+  loginWithEmail,
+  resendVerificationEmail,
+  refreshUserVerification
+} from './firebase';
 
+/**
+ * Converts a Date object to a datetime-local input string (YYYY-MM-DDTHH:mm).
+ *
+ * @param {Date} [date=new Date()]
+ * @returns {string} Formatted string suitable for <input type="datetime-local" />
+ */
 const dateInput = (date = new Date()) => {
   const d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return d.toISOString().slice(0, 16);
@@ -53,27 +80,260 @@ const COLOR_PALETTE = [
   { name: 'Coral Red', hex: '#fb7185' }
 ];
 
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
 function AuthScreen({ onAuth, theme = 'dark', onToggleTheme }) {
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'verify'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [verifyEmail, setVerifyEmail] = useState('');
+  const [devCode, setDevCode] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Handle URL Email Verification Token on mount (e.g. ?verify_token=...&verify_email=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('verify_token');
+    const emailParam = params.get('verify_email');
+
+    if (token && emailParam) {
+      setBusy(true);
+      setError('');
+      api('/auth/verify-email', {
+        method: 'POST',
+        body: JSON.stringify({ email: emailParam, token })
+      })
+        .then((data) => {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setToken(data.token);
+          onAuth(data.user);
+        })
+        .catch((err) => {
+          setError(err.message || 'Verification link expired or invalid.');
+          setMode('verify');
+          setVerifyEmail(emailParam);
+        })
+        .finally(() => setBusy(false));
+    }
+  }, [onAuth]);
+
+  // Resend cooldown timer tick
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // Google Sign-In via Firebase Auth Popup
+  async function handleGoogleSignIn() {
+    setBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      const firebaseUser = await signInWithGoogle();
+      const idToken = await firebaseUser.getIdToken();
+
+      // Exchange with backend to synchronize with MongoDB
+      const data = await api('/auth/firebase-login', {
+        method: 'POST',
+        body: JSON.stringify({ idToken })
+      });
+
+      setToken(data.token);
+      onAuth(data.user);
+    } catch (err) {
+      console.error('Firebase Google Sign-In error:', err);
+      if (err.code === 'auth/popup-closed-by-user') {
+        setError('Google sign-in popup was closed before completion.');
+      } else {
+        setError(err.message || 'Google sign-in failed.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Submit Registration or Login via Firebase Auth
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setError('');
+    setSuccess('');
+
     try {
-      const data = await api(`/auth/${mode}`, {
+      if (mode === 'register') {
+        // 1. Create account on Firebase
+        await registerWithEmail(name, email, password);
+
+        // 2. Also register in local database for OTP / link fallback
+        try {
+          const localData = await api('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, password })
+          });
+          if (localData?.devCode) setDevCode(localData.devCode);
+        } catch {
+          // ignore if local register notices email in use
+        }
+
+        setVerifyEmail(email);
+        setMode('verify');
+        setSuccess(`Verification email sent by Google to ${email}! Click the link in your email to activate.`);
+        setResendCooldown(60);
+      } else {
+        // mode === 'login'
+        let firebaseUser;
+        try {
+          firebaseUser = await loginWithEmail(email, password);
+        } catch (fbErr) {
+          // Fallback to local MongoDB check if not registered on Firebase
+          if (fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/invalid-credential') {
+            const data = await api('/auth/login', {
+              method: 'POST',
+              body: JSON.stringify({ email, password })
+            });
+            setToken(data.token);
+            onAuth(data.user);
+            return;
+          }
+          throw fbErr;
+        }
+
+        // Check if verified
+        if (!firebaseUser.emailVerified) {
+          setVerifyEmail(email);
+          setMode('verify');
+          setError("Your email address is not verified yet. Please check your inbox for Google's verification link.");
+          return;
+        }
+
+        // Exchange Firebase ID Token with StudyPilot Backend
+        const idToken = await firebaseUser.getIdToken();
+        const data = await api('/auth/firebase-login', {
+          method: 'POST',
+          body: JSON.stringify({ idToken })
+        });
+
+        setToken(data.token);
+        onAuth(data.user);
+      }
+    } catch (err) {
+      if (err.message && err.message.toLowerCase().includes('not verified')) {
+        setVerifyEmail(email);
+        setMode('verify');
+        setError(err.message);
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists. Try signing in, or use Google.');
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Email or password is incorrect.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password should be at least 8 characters.');
+      } else {
+        setError(err.message || 'Authentication failed.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Check if student clicked Google's verification link
+  async function checkVerificationStatus() {
+    setBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      const refreshedUser = await refreshUserVerification();
+      if (refreshedUser && refreshedUser.emailVerified) {
+        const idToken = await refreshedUser.getIdToken();
+        const data = await api('/auth/firebase-login', {
+          method: 'POST',
+          body: JSON.stringify({ idToken })
+        });
+        setToken(data.token);
+        onAuth(data.user);
+      } else {
+        setError("We haven't detected your email confirmation yet. Please open the email sent to " + verifyEmail + " and click the verification link, then click here again!");
+      }
+    } catch (err) {
+      setError(err.message || 'Verification check failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Submit 6-digit OTP Email Verification (Fallback / Simulation)
+  async function submitVerify(e) {
+    e.preventDefault();
+    if (!otpCode || otpCode.trim().length < 6) {
+      setError('Please enter the full 6-digit verification code.');
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      const data = await api('/auth/verify-email', {
         method: 'POST',
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({
+          email: verifyEmail,
+          code: otpCode.trim()
+        })
       });
       setToken(data.token);
       onAuth(data.user);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Verification failed. Please check the code.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Resend Email Verification
+  async function resendCode() {
+    if (resendCooldown > 0 || busy) return;
+    setBusy(true);
+    setError('');
+    setSuccess('');
+    try {
+      await resendVerificationEmail();
+      const data = await api('/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: verifyEmail })
+      });
+      if (data?.devCode) setDevCode(data.devCode);
+      setSuccess('A fresh verification link has been sent to your email.');
+      setResendCooldown(60);
+    } catch (err) {
+      setError(err.message || 'Could not resend verification email.');
     } finally {
       setBusy(false);
     }
@@ -141,77 +401,210 @@ function AuthScreen({ onAuth, theme = 'dark', onToggleTheme }) {
               </button>
             )}
           </div>
-          <span className="eyebrow">WELCOME {mode === 'login' ? 'BACK' : 'ABOARD'}</span>
-          <h2>
-            {mode === 'login'
-              ? 'Your study workspace awaits.'
-              : 'Start your study journey.'}
-          </h2>
-          <p className="muted">
-            {mode === 'login'
-              ? 'Sign in to access your customized study schedule.'
-              : 'Create an account to start generating visual study plans.'}
-          </p>
 
-          <form onSubmit={submit} className="form-stack">
-            {mode === 'register' && (
-              <label>
-                Full name
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  placeholder="e.g. Alex Mercer"
-                />
-              </label>
-            )}
-            <label>
-              Email address
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="you@example.com"
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                minLength={8}
-                required
-                placeholder="At least 8 characters"
-              />
-            </label>
-            {error && <div className="error-msg">{error}</div>}
-            <button className="btn primary full" disabled={busy}>
-              {busy
-                ? 'Please wait…'
-                : mode === 'login'
-                ? 'Sign in to StudyPilot'
-                : 'Create Account'}{' '}
-              <ArrowUpRight size={17} />
-            </button>
-          </form>
+          {/* =================================================================
+              VIEW 1: EMAIL VERIFICATION SCREEN
+              ================================================================= */}
+          {mode === 'verify' ? (
+            <div className="verify-card">
+              <div className="verify-icon-wrap">
+                <Mail size={26} />
+              </div>
+              <span className="eyebrow">VERIFY YOUR EMAIL ADDRESS</span>
+              <h2>Check your inbox.</h2>
+              <p className="muted">
+                To prevent fake or non-existent accounts, a verification link has been sent to:
+              </p>
 
-          <p className="auth-switch">
-            {mode === 'login' ? 'New to StudyPilot?' : 'Already have an account?'}{' '}
-            <button
-              onClick={() => {
-                setMode(mode === 'login' ? 'register' : 'login');
-                setError('');
-              }}
-            >
-              {mode === 'login' ? 'Create an account' : 'Sign in'}
-            </button>
-          </p>
+              <div className="verify-email-badge">
+                <Mail size={14} />
+                <span>{verifyEmail}</span>
+              </div>
 
-          <div className="secure-note">
-            <ShieldCheck size={15} /> Data secured & isolated to your account.
-          </div>
+              {error && <div className="error-msg" style={{ marginBottom: 14 }}>{error}</div>}
+              {success && <div className="success-msg">{success}</div>}
+
+              {/* Primary Action: Check if user clicked email link */}
+              <button
+                type="button"
+                className="btn primary full"
+                onClick={checkVerificationStatus}
+                disabled={busy}
+                style={{ marginBottom: 14 }}
+              >
+                {busy ? 'Verifying status…' : 'I Have Verified My Email (Continue)'}{' '}
+                <ArrowUpRight size={17} />
+              </button>
+
+              {/* Optional 6-digit OTP code form */}
+              <form onSubmit={submitVerify} className="form-stack" style={{ marginTop: 8 }}>
+                <label style={{ textAlign: 'left', fontSize: 11 }}>
+                  Or enter 6-digit activation code (if provided):
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="otp-input"
+                    placeholder="123456"
+                    maxLength={6}
+                  />
+                </label>
+
+                {otpCode.length === 6 && (
+                  <button
+                    type="submit"
+                    className="btn light full"
+                    disabled={busy}
+                  >
+                    Confirm Code
+                  </button>
+                )}
+              </form>
+
+              {/* Dev Simulation Helper Banner */}
+              {devCode && (
+                <div className="dev-code-banner">
+                  <div>
+                    🛠️ <strong>Dev Simulation:</strong> Code is{' '}
+                    <code style={{ fontSize: 13, fontWeight: 700 }}>{devCode}</code>
+                  </div>
+                  <button
+                    type="button"
+                    className="dev-code-fill-btn"
+                    onClick={() => setOtpCode(devCode)}
+                  >
+                    Auto-Fill
+                  </button>
+                </div>
+              )}
+
+              <div className="auth-action-links">
+                <button
+                  type="button"
+                  className="auth-link-btn brand"
+                  onClick={resendCode}
+                  disabled={resendCooldown > 0 || busy}
+                >
+                  {resendCooldown > 0
+                    ? `Resend email in ${resendCooldown}s`
+                    : 'Did not receive email? Resend'}
+                </button>
+
+                <button
+                  type="button"
+                  className="auth-link-btn"
+                  onClick={() => {
+                    setMode('login');
+                    setError('');
+                    setSuccess('');
+                  }}
+                >
+                  Back to Sign In / Edit Email
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* =================================================================
+               VIEW 2: LOGIN / REGISTRATION SCREEN
+               ================================================================= */
+            <div>
+              <span className="eyebrow">WELCOME {mode === 'login' ? 'BACK' : 'ABOARD'}</span>
+              <h2>
+                {mode === 'login'
+                  ? 'Your study workspace awaits.'
+                  : 'Start your study journey.'}
+              </h2>
+              <p className="muted">
+                {mode === 'login'
+                  ? 'Sign in to access your customized study schedule.'
+                  : 'Create an account to start generating visual study plans.'}
+              </p>
+
+              {/* Google Sign-In Button via Firebase Popup */}
+              <div className="google-btn-wrapper">
+                <button
+                  type="button"
+                  className="google-btn-custom"
+                  onClick={handleGoogleSignIn}
+                  disabled={busy}
+                >
+                  <GoogleIcon />
+                  <span>{mode === 'register' ? 'Sign up with Google' : 'Sign in with Google'}</span>
+                </button>
+              </div>
+
+              <div className="auth-divider">
+                <span>or continue with email</span>
+              </div>
+
+              {error && <div className="error-msg" style={{ marginBottom: 12 }}>{error}</div>}
+              {success && <div className="success-msg">{success}</div>}
+
+              <form onSubmit={submit} className="form-stack">
+                {mode === 'register' && (
+                  <label>
+                    Full name
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      placeholder="e.g. Alex Mercer"
+                    />
+                  </label>
+                )}
+                <label>
+                  Email address
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="you@example.com"
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    minLength={8}
+                    required
+                    placeholder="At least 8 characters"
+                  />
+                </label>
+
+                <button className="btn primary full" disabled={busy}>
+                  {busy
+                    ? 'Please wait…'
+                    : mode === 'login'
+                    ? 'Sign in to StudyPilot'
+                    : 'Create Account & Verify Email'}{' '}
+                  <ArrowUpRight size={17} />
+                </button>
+              </form>
+
+              <p className="auth-switch">
+                {mode === 'login' ? 'New to StudyPilot?' : 'Already have an account?'}{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode(mode === 'login' ? 'register' : 'login');
+                    setError('');
+                    setSuccess('');
+                  }}
+                >
+                  {mode === 'login' ? 'Create an account' : 'Sign in'}
+                </button>
+              </p>
+
+              <div className="secure-note">
+                <ShieldCheck size={15} /> All accounts require verified email ownership.
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </main>
@@ -260,6 +653,34 @@ export default function App() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Set password state for Google accounts
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordModalError, setPasswordModalError] = useState('');
+
+  async function handleSetPassword(e) {
+    e.preventDefault();
+    if (newPassword.length < 8) {
+      setPasswordModalError('Password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordModalError('Passwords do not match.');
+      return;
+    }
+    setPasswordModalError('');
+    await act(async () => {
+      const data = await api('/auth/set-password', {
+        method: 'POST',
+        body: JSON.stringify({ password: newPassword })
+      });
+      setUser(data.user);
+      setModal('');
+      setNewPassword('');
+      setConfirmPassword('');
+    }, 'Password linked! You can now log in using either Google or your password.');
+  }
 
   // Active study companion timer
   const [activeTimerSession, setActiveTimerSession] = useState(null);
@@ -679,10 +1100,44 @@ export default function App() {
           </div>
 
           <div className="user-mini">
-            <div className="avatar">{user.name?.slice(0, 1).toUpperCase()}</div>
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="avatar"
+                style={{ objectFit: 'cover', borderRadius: '50%' }}
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="avatar">{user.name?.slice(0, 1).toUpperCase()}</div>
+            )}
             <div className="user-info">
               <strong>{user.name}</strong>
-              <span>{user.email}</span>
+              <span title={user.email}>{user.email}</span>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
+                <span className="auth-provider-tag">
+                  {user.authProvider === 'both'
+                    ? 'Unified (Google + Password)'
+                    : user.authProvider === 'google'
+                    ? 'Google Account'
+                    : 'Email Verified'}
+                </span>
+                {!user.hasPassword && (
+                  <button
+                    type="button"
+                    className="set-pwd-badge"
+                    onClick={() => {
+                      setPasswordModalError('');
+                      setNewPassword('');
+                      setConfirmPassword('');
+                      setModal('setPassword');
+                    }}
+                    title="Add a password so you can also log in manually"
+                  >
+                    <KeyRound size={11} /> Set Password
+                  </button>
+                )}
+              </div>
             </div>
             <button
               className="icon-btn logout"
@@ -1791,6 +2246,57 @@ export default function App() {
               </button>
               <button className="btn primary" disabled={busy}>
                 {busy ? 'Saving…' : 'Save Window'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Set Password Modal for Google-only users */}
+      {modal === 'setPassword' && (
+        <Modal title="Enable Password Login" onClose={() => setModal('')}>
+          <form className="form-stack" onSubmit={handleSetPassword}>
+            <p className="muted" style={{ margin: 0, fontSize: 13, lineHeight: 1.5 }}>
+              Your account currently signs in through Google. Setting a password allows you to log in either manually (email + password) OR with Google Sign-In into the exact same study workspace!
+            </p>
+
+            <label>
+              Create Account Password
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                autoFocus
+              />
+            </label>
+
+            <label>
+              Confirm Password
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter password"
+              />
+            </label>
+
+            {passwordModalError && <div className="error-msg">{passwordModalError}</div>}
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => setModal('')}
+              >
+                Cancel
+              </button>
+              <button className="btn primary" disabled={busy}>
+                {busy ? 'Linking password…' : 'Save & Link Password'}
               </button>
             </div>
           </form>

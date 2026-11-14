@@ -1,69 +1,103 @@
-# StudyPilot — Full-Stack MVP
+# StudyPilot — Intelligent Adaptive Study Planner
 
-StudyPilot is an adaptive study planning application for the FSD-1 and FSD-2 capstone.
+[![Node.js](https://img.shields.io/badge/Node.js-v20%2B-green.svg)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev/)
+[![Express](https://img.shields.io/badge/Express-4.x-lightgrey.svg)](https://expressjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-brightgreen.svg)](https://mongoosejs.com/)
 
-## Features
-- Student registration and login (JWT)
-- Subject and task CRUD
-- Priority scoring using urgency, importance, difficulty and confidence
-- Greedy schedule generation with availability windows and daily workload limits
-- Missed/completed study session tracking
-- Adaptive rescheduling of unfinished sessions
-- Workload feasibility warnings and schedule version history
-- Dashboard analytics
+**StudyPilot** is an intelligent, full-stack adaptive study planner engineered for university students. Rather than relying on rigid calendars or manual to-do lists, StudyPilot calculates dynamic multi-factor priority scores and greedily allocates study blocks into student-defined availability windows while strictly respecting deadlines, daily study caps, and rest intervals.
 
-## Stack
-- Frontend: React + Vite
-- Backend: Node.js + Express
-- Database: MongoDB + Mongoose
-- Auth: bcryptjs + JSON Web Tokens
+---
 
-## Requirements
-- Node.js 20+ recommended
-- MongoDB local instance or MongoDB Atlas connection string
+## 📚 Technical Documentation Suite
 
-## Run locally
-1. Copy `.env.example` to `server/.env` and set `MONGODB_URI` and `JWT_SECRET`.
-2. In a terminal:
-   ```bash
-   cd server
-   npm install
-   npm run dev
-   ```
-3. In another terminal:
-   ```bash
-   cd client
-   npm install
-   npm run dev
-   ```
-4. Open the URL printed by Vite (usually http://localhost:5173).
-5. Register a new account and add subjects/tasks. Set availability before generating a schedule.
+For deep internal documentation, design diagrams, and architectural breakdowns, please refer to the dedicated `docs/` repository:
 
-## API overview
-- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
-- `GET/POST /api/subjects`, `PATCH/DELETE /api/subjects/:id`
-- `GET/POST /api/tasks`, `PATCH/DELETE /api/tasks/:id`
-- `GET/POST /api/availability`
-- `POST /api/schedules/generate`, `POST /api/schedules/reschedule`, `GET /api/schedules/latest`, `GET /api/schedules`
-- `POST /api/sessions/:id/complete`, `POST /api/sessions/:id/miss`, `POST /api/sessions/:id/start`
-- `GET /api/analytics/progress`
+| Document | Purpose & Contents |
+| :--- | :--- |
+| **[System Architecture Guide](file:///D:/projects%20and%20their%20versions/FSDIILab/docs/ARCHITECTURE.md)** | High-level architecture, Mermaid diagrams, scheduling engine math, heuristic formulas, syllabus parsing pipeline, and Database ERD. |
+| **[REST API Reference](file:///D:/projects%20and%20their%20versions/FSDIILab/docs/API_DOCUMENTATION.md)** | Complete endpoint specifications, authentication schemas, request body shapes, status codes, and JSON response examples. |
+| **[Codebase & Developer Guide](file:///D:/projects%20and%20their%20versions/FSDIILab/docs/CODEBASE_GUIDE.md)** | Detailed directory tree, component responsibilities, coding conventions, JSDoc rules, and local development setup. |
 
-## Important implementation notes
-- Times are stored as ISO dates. Availability entries are explicit date-time windows.
-- Priority scores are heuristic, not scientifically validated predictions.
-- The greedy scheduler is a baseline and does not guarantee a globally optimal schedule.
-- A generated schedule can leave tasks unscheduled; the API returns these tasks and a feasibility summary rather than pretending the plan is complete.
-- For production, add rate limiting, email verification, refresh-token strategy, CSRF protections appropriate to your auth storage, stronger audit logging, and more extensive tests.
+---
 
-## FSD-1 adaptation
-Use the `client` as the interface reference and implement the same task/priority/scheduling concepts with HTML, CSS, Bootstrap and vanilla JavaScript using mock data.
+## ⚡ Core Features
 
-## Project structure
+- **🔐 Student Authentication & Workload Profiles**: Secure registration, login, and token-based authentication (JWT + bcryptjs). Personalized daily study limits (preventing burnout) and preferred session durations.
+- **📚 Color-Coded Academic Course Hub**: Organize courses, color badges, semesters, and associated study goals.
+- **📄 Intelligent Syllabus Ingestion & Document Parser**: Upload PDF, DOCX, Markdown, or plain text syllabus outlines. Automatic extraction of curriculum units, key terms, estimated hours, and difficulty rating.
+- **✨ One-Click Task Generator**: Instantly transform syllabus modules into scheduled study tasks with staggered deadlines.
+- **🎯 Multi-Factor Heuristic Priority Scoring**: Dynamically scores tasks ($0.0$ to $1.0$) balancing deadline urgency, user importance, difficulty rating, and inverted confidence gap.
+- **🗓️ Greedy Interval Scheduling Engine**: Packs study sessions into custom availability windows, maintaining daily caps and 5-minute breather buffers.
+- **⏱️ Focus / Pomodoro Study Timer**: Built-in countdown timer with pause/resume, minimization to floating badge, and auto-sync of completed study minutes to database.
+- **🔄 Missed Session Recovery**: Detects skipped or interrupted sessions and triggers adaptive rescheduling to protect academic deadlines.
+- **📊 Study Analytics Dashboard**: Visualizes completion percentage, study hour investments, and subject-wise progress breakdowns.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React 18, Vite, Lucide React Icons, Native HTML5 Audio API, CSS3 Variables |
+| **Backend** | Node.js (ES Modules), Express 4.x, Express Rate Limit, CORS |
+| **Database** | MongoDB Atlas, Mongoose ODM |
+| **Document Processing** | `pdf-parse`, `mammoth` (DOCX), FileReader API |
+| **Authentication** | JSON Web Tokens (`jsonwebtoken`), `bcryptjs` |
+
+---
+
+## 🚀 Quick Start Guide
+
+### Prerequisites
+- Node.js 18+ (Node 20+ recommended)
+- A running MongoDB instance or MongoDB Atlas connection string
+
+### 1. Backend Setup
+```bash
+cd server
+npm install
+
+# Configure environment variables
+cp .env.example .env
+# Edit server/.env and supply MONGODB_URI and JWT_SECRET
+
+# Start API server in development mode
+npm run dev
 ```
-studypilot/
-  client/   React UI
-  server/   Express API, Mongoose models, scheduler services
-```
+The server will start listening at `http://localhost:5000` (or configured `PORT`).
 
-## FSD-1 standalone prototype
-Open `fsd1-prototype/index.html` directly in a modern browser. It uses vanilla HTML/CSS/JavaScript and localStorage (no server needed). It demonstrates task creation, priority scoring, a simulated schedule, task completion and a basic recovery action. This is a teaching prototype; its schedule is intentionally simpler than the FSD-2 backend engine.
+### 2. Frontend Setup
+```bash
+cd client
+npm install
+
+# Start Vite development server
+npm run dev
+```
+Open `http://localhost:5173` in your browser.
+
+---
+
+## 📂 Project Structure Overview
+
+```
+FSDIILab/
+├── docs/                     # System architecture, API docs, and developer guide
+├── client/                   # Vite + React 18 Single Page Application
+│   ├── src/
+│   │   ├── components/       # Calendar, Tasks, Availability, Subjects, Timer, Modals
+│   │   ├── utils/            # Document extraction helpers
+│   │   ├── api.js            # Fetch wrapper & JWT token manager
+│   │   ├── App.jsx           # Main orchestrator & application state
+│   │   └── styles.css        # Responsive design & theme styles
+├── server/                   # Express REST API
+│   ├── src/
+│   │   ├── middleware/       # JWT authentication middleware
+│   │   ├── models/           # Mongoose schemas (User, Task, Subject, Schedule, etc.)
+│   │   ├── routes/           # Domain controllers & route endpoints
+│   │   ├── services/         # Greedy scheduler & document parsing services
+│   │   ├── utils/            # Async handler wrapper
+│   │   └── app.js            # Express app entry & database connection
+└── package.json              # Monorepo root configuration
+```

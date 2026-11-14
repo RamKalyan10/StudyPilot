@@ -1,3 +1,10 @@
+/**
+ * @file StudyTimer.jsx
+ * @description Focused Study & Pomodoro Timer Floating Component.
+ * Supports countdown intervals, pause/resume, reset, minimization to floating badge,
+ * audio chime completion alerts, and automatic session completion syncing with API.
+ */
+
 import { useState, useEffect } from 'react';
 import {
   Play,
@@ -10,6 +17,13 @@ import {
   Target
 } from 'lucide-react';
 
+/**
+ * @param {Object} props
+ * @param {Object} props.activeSession - Selected study session object
+ * @param {Function} props.onClose - Close timer modal callback
+ * @param {Function} props.onCompleteSession - Session completion handler (logs actual minutes)
+ * @param {Array<Object>} [props.subjects=[]] - Enrolled subjects for color badge identification
+ */
 export default function StudyTimer({
   activeSession,
   onClose,

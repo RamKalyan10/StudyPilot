@@ -1,3 +1,10 @@
+/**
+ * @file SmartStudyGuide.jsx
+ * @description Contextual Onboarding & Scheduling Guidance Banner.
+ * Evaluates current student state (missing availability, unscheduled tasks, empty syllabus)
+ * and surfaces interactive one-click recommendations and workflow shortcuts.
+ */
+
 import { useState } from 'react';
 import {
   Clock3,
@@ -12,6 +19,20 @@ import {
   Check
 } from 'lucide-react';
 
+/**
+ * @param {Object} props
+ * @param {Array<Object>} props.availability - Current availability windows
+ * @param {Array<Object>} props.tasks - Active study tasks
+ * @param {Object|null} props.schedule - Current active schedule
+ * @param {Array<Object>} props.upcomingSessions - Next scheduled study sessions
+ * @param {Function} props.onOpenAvailabilityModal - Open add window modal
+ * @param {Function} props.onOpenTaskModal - Open add task modal
+ * @param {Function} props.onOpenSyllabusModal - Open syllabus parser modal
+ * @param {Function} props.onGenerateSchedule - Trigger timetable generation
+ * @param {Function} props.onNavigate - Switch active dashboard tab
+ * @param {Function} props.onAddPresetAvailability - Inject preset study windows (e.g. evening study)
+ * @param {boolean} [props.busy=false] - Async action loading indicator
+ */
 export default function SmartStudyGuide({
   availability = [],
   tasks = [],

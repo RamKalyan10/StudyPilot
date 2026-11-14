@@ -1,3 +1,11 @@
+/**
+ * @file CalendarView.jsx
+ * @description Interactive Multi-View Calendar Component.
+ * Supports Week view, Month grid, and Agenda chronological listing with
+ * session interaction (start timer, mark complete, mark missed), subject filtering,
+ * and quick-action shortcuts.
+ */
+
 import { useState, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
@@ -15,6 +23,12 @@ import {
   BookOpen
 } from 'lucide-react';
 
+/**
+ * Normalizes a datetime into local YYYY-MM-DD format key.
+ *
+ * @param {Date|string} d
+ * @returns {string} Date key in 'YYYY-MM-DD' format
+ */
 export const getLocalDateKey = (d) => {
   const date = new Date(d);
   if (isNaN(date.getTime())) return '';
@@ -24,6 +38,18 @@ export const getLocalDateKey = (d) => {
   return `${year}-${month}-${day}`;
 };
 
+/**
+ * @param {Object} props
+ * @param {Object} props.schedule - Active schedule containing sessions and summaries
+ * @param {Array<Object>} props.availability - Availability windows list
+ * @param {Array<Object>} props.subjects - Enrolled courses
+ * @param {Function} props.onAction - Session action handler (complete, miss, start)
+ * @param {Function} props.onGenerate - Trigger schedule generation callback
+ * @param {Function} props.onOpenTimer - Open Pomodoro/Focus timer with a specific session
+ * @param {Function} props.onSetAvailability - Open availability modal
+ * @param {Function} props.onAddTask - Open add task modal
+ * @param {boolean} [props.busy=false] - Async action loading indicator
+ */
 export default function CalendarView({
   schedule,
   availability = [],

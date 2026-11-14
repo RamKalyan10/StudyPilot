@@ -1,3 +1,10 @@
+/**
+ * @file AvailabilityView.jsx
+ * @description Dedicated Study Windows & Availability Management View.
+ * Displays scheduled free study blocks, aggregates total available study hours,
+ * and allows students to add new windows or trigger schedule generation.
+ */
+
 import { useMemo } from 'react';
 import {
   Clock,
@@ -7,6 +14,14 @@ import {
   Trash2
 } from 'lucide-react';
 
+/**
+ * @param {Object} props
+ * @param {Array<Object>} props.availability - List of student study windows
+ * @param {Function} props.onOpenModal - Callback to open the add availability modal
+ * @param {Function} props.onDeleteAvailability - Callback to delete a specific window
+ * @param {Function} props.onGenerateSchedule - Callback to trigger schedule generation
+ * @param {boolean} [props.busy=false] - Loading indicator state
+ */
 export default function AvailabilityView({
   availability = [],
   onOpenModal,

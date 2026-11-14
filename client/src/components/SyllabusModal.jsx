@@ -1,3 +1,11 @@
+/**
+ * @file SyllabusModal.jsx
+ * @description Intelligent Syllabus Ingestion & Automated Study Task Conversion Modal.
+ * Supports document upload (PDF, DOCX, TXT, MD), drag & drop, manual text pasting,
+ * curriculum unit preview, sample syllabi loading, and one-click conversion of syllabus units
+ * into scheduled study tasks.
+ */
+
 import { useState } from 'react';
 import {
   BookOpen,
