@@ -26,7 +26,7 @@ import {
 const getFallbackKey = () => {
   try {
     return typeof atob === 'function'
-      ? atob('QUl6YVN5QmNwa2tZZF90MDAyTU54Mm1YbmREcm5mRzBOSHNESmpr')
+      ? atob('QUl6YVN5QlN0bkZ6cEtNcHB2M3hCVzhNbXRNUWtjdHR0eTVNVUpV')
       : '';
   } catch {
     return '';
@@ -35,11 +35,11 @@ const getFallbackKey = () => {
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || getFallbackKey(),
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'studypilot-be3c1.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'studypilot-be3c1',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'studypilot-be3c1.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '480284339241',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:480284339241:web:2e62cf9f5457d620b88038'
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'studypilot-3ff4b.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'studypilot-3ff4b',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'studypilot-3ff4b.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '652737023292',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:652737023292:web:beaa88764afd52859c6239'
 };
 
 let firebaseApp = null;

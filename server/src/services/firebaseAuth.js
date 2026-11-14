@@ -57,7 +57,7 @@ export async function verifyFirebaseIdToken(idToken) {
     throw new Error('Firebase ID token is required.');
   }
 
-  const projectId = process.env.FIREBASE_PROJECT_ID || 'studypilot-be3c1';
+  const projectId = process.env.FIREBASE_PROJECT_ID || 'studypilot-3ff4b';
   const expectedIssuer = `https://securetoken.google.com/${projectId}`;
 
   // Step 1: Decode header to find Key ID ('kid')
