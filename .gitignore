@@ -56,6 +56,10 @@ ehthumbs.db
 *.sw?
 *.sublime-*
 
+# Reference Prototype folders
+studypilot-—*
+studypilot-*/
+
 # Testing & Coverage Artifacts
 coverage/
 .nyc_output/

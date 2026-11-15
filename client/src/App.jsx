@@ -40,7 +40,8 @@ import {
   Lock,
   RefreshCcw,
   CheckCircle,
-  ExternalLink
+  ExternalLink,
+  ChevronDown
 } from 'lucide-react';
 import { api, getToken, setToken } from './api';
 import CalendarView from './components/CalendarView';
@@ -51,6 +52,8 @@ import SubjectsView from './components/SubjectsView';
 import InsightsView from './components/InsightsView';
 import SmartStudyGuide from './components/SmartStudyGuide';
 import SyllabusModal, { SAMPLE_DSA_SYLLABUS, SAMPLE_DBMS_SYLLABUS } from './components/SyllabusModal';
+import StreakCalendarModal from './components/StreakCalendarModal';
+import { computeStreakData } from './utils/streakUtils';
 import { extractDocumentText } from './utils/docExtractor';
 import {
   signInWithGoogle,
@@ -77,7 +80,7 @@ const COLOR_PALETTE = [
   { name: 'Emerald Mint', hex: '#34d399' },
   { name: 'Warm Amber', hex: '#fb923c' },
   { name: 'Rose Pink', hex: '#f472b6' },
-  { name: 'Soft Violet', hex: '#a78bfa' },
+  { name: 'Golden Sun', hex: '#f59e0b' },
   { name: 'Coral Red', hex: '#fb7185' }
 ];
 
@@ -633,6 +636,153 @@ function Modal({ title, onClose, children }) {
   );
 }
 
+function QuickAddDropdown({
+  onAddTask,
+  onAddAvailability,
+  onGeneratePlan,
+  onAddSubject,
+  onAnalyzeSyllabus,
+  busy = false
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="quick-add-wrap" ref={ref}>
+      <button
+        type="button"
+        className={`btn primary quick-add-trigger ${open ? 'open' : ''}`}
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title="Quick Add actions"
+      >
+        <Plus size={16} />
+        <span>Quick Add</span>
+        <ChevronDown size={14} className={`quick-add-chevron ${open ? 'rotated' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="quick-add-menu" role="menu" aria-label="Quick Add Actions">
+          <button
+            type="button"
+            role="menuitem"
+            className="quick-action-item"
+            onClick={() => {
+              setOpen(false);
+              onAddTask();
+            }}
+          >
+            <div className="quick-action-icon">
+              <Plus size={16} />
+            </div>
+            <div className="quick-action-content">
+              <strong>Add a Task</strong>
+              <span>Capture topics, assignments &amp; exams</span>
+            </div>
+            <ArrowUpRight size={15} className="quick-action-arrow" />
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            className="quick-action-item"
+            onClick={() => {
+              setOpen(false);
+              onAddAvailability();
+            }}
+          >
+            <div className="quick-action-icon">
+              <Clock3 size={16} />
+            </div>
+            <div className="quick-action-content">
+              <strong>Set Availability</strong>
+              <span>Reserve blocks for focused work</span>
+            </div>
+            <ArrowUpRight size={15} className="quick-action-arrow" />
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            className="quick-action-item"
+            onClick={() => {
+              setOpen(false);
+              onGeneratePlan();
+            }}
+            disabled={busy}
+          >
+            <div className="quick-action-icon">
+              <RefreshCw size={16} className={busy ? 'spin' : ''} />
+            </div>
+            <div className="quick-action-content">
+              <strong>Generate Plan</strong>
+              <span>Auto-slot tasks into study calendar</span>
+            </div>
+            <ArrowUpRight size={15} className="quick-action-arrow" />
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            className="quick-action-item"
+            onClick={() => {
+              setOpen(false);
+              onAddSubject();
+            }}
+          >
+            <div className="quick-action-icon">
+              <BookOpen size={16} />
+            </div>
+            <div className="quick-action-content">
+              <strong>Add Subject</strong>
+              <span>Organize your syllabus with colors</span>
+            </div>
+            <ArrowUpRight size={15} className="quick-action-arrow" />
+          </button>
+
+          <button
+            type="button"
+            role="menuitem"
+            className="quick-action-item"
+            onClick={() => {
+              setOpen(false);
+              onAnalyzeSyllabus();
+            }}
+          >
+            <div className="quick-action-icon">
+              <FileText size={16} />
+            </div>
+            <div className="quick-action-content">
+              <strong>Analyze Syllabus</strong>
+              <span>Extract &amp; summarize topics by unit</span>
+            </div>
+            <ArrowUpRight size={15} className="quick-action-arrow" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem('studypilot_theme') || 'dark');
   const [user, setUser] = useState(null);
@@ -666,6 +816,10 @@ export default function App() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showStreakModal, setShowStreakModal] = useState(false);
+
+  // Gamified study streak calculations
+  const streakStats = useMemo(() => computeStreakData(tasks, schedule), [tasks, schedule]);
 
   // Set password state for Google accounts
   const [newPassword, setNewPassword] = useState('');
@@ -1122,14 +1276,29 @@ export default function App() {
         )}
 
         <div className="sidebar-bottom">
-          <div className="focus-card">
-            <div className="focus-icon">
-              <Flame size={18} />
+          <div
+            className="focus-card streak-card"
+            onClick={() => setShowStreakModal(true)}
+            role="button"
+            tabIndex={0}
+            title="Open Study Streak Cockpit & Calendar"
+          >
+            <div className="focus-card-top">
+              <div className="focus-icon">
+                <Flame size={18} />
+              </div>
+              <span className="streak-tag">
+                🔥 {streakStats.currentStreak}d Streak
+              </span>
             </div>
             <strong>Daily Study Rhythm</strong>
-            <p>Consistency beats cramming. Build your streak one session at a time.</p>
+            <p>
+              {streakStats.todayAchieved
+                ? 'All tasks done today! Streak locked in 🔥'
+                : 'Complete all daily tasks to keep your streak alive! Tap for calendar 📅'}
+            </p>
             <div className="focus-line">
-              <span />
+              <span style={{ width: streakStats.todayAchieved ? '100%' : `${Math.min(100, Math.max(15, (streakStats.currentStreak / 7) * 100))}%` }} />
             </div>
           </div>
 
@@ -1224,6 +1393,17 @@ export default function App() {
               </button>
             )}
 
+            {/* Gamified Study Streak Pill */}
+            <button
+              type="button"
+              className="topbar-streak-chip"
+              onClick={() => setShowStreakModal(true)}
+              title="Click to view Study Streak Calendar & Trophies"
+            >
+              <Flame size={15} className={`streak-flame-icon ${streakStats.todayAchieved ? 'glow' : ''}`} />
+              <span>{streakStats.currentStreak} Day Streak</span>
+            </button>
+
             <span className="today-label">
               <span className="status-dot" />
               {new Date().toLocaleDateString([], {
@@ -1291,9 +1471,14 @@ export default function App() {
                   >
                     <RefreshCw size={15} className={busy ? 'spin' : ''} /> Reschedule
                   </button>
-                  <button className="btn primary" onClick={() => setModal('task')}>
-                    <Plus size={16} /> New Task
-                  </button>
+                  <QuickAddDropdown
+                    onAddTask={() => setModal('task')}
+                    onAddAvailability={() => setModal('availability')}
+                    onGeneratePlan={() => generate(false)}
+                    onAddSubject={() => setModal('subject')}
+                    onAnalyzeSyllabus={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
+                    busy={busy}
+                  />
                 </>
               )}
 
@@ -1306,16 +1491,26 @@ export default function App() {
                   >
                     <RefreshCw size={15} className={busy ? 'spin' : ''} /> Reschedule
                   </button>
-                  <button className="btn primary" onClick={() => setModal('task')}>
-                    <Plus size={16} /> New Task
-                  </button>
+                  <QuickAddDropdown
+                    onAddTask={() => setModal('task')}
+                    onAddAvailability={() => setModal('availability')}
+                    onGeneratePlan={() => generate(false)}
+                    onAddSubject={() => setModal('subject')}
+                    onAnalyzeSyllabus={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
+                    busy={busy}
+                  />
                 </>
               )}
 
               {page === 'My tasks' && (
-                <button className="btn primary" onClick={() => setModal('task')}>
-                  <Plus size={16} /> New Task
-                </button>
+                <QuickAddDropdown
+                  onAddTask={() => setModal('task')}
+                  onAddAvailability={() => setModal('availability')}
+                  onGeneratePlan={() => generate(false)}
+                  onAddSubject={() => setModal('subject')}
+                  onAnalyzeSyllabus={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
+                  busy={busy}
+                />
               )}
 
               {page === 'Availability' && (
@@ -1327,9 +1522,14 @@ export default function App() {
                   >
                     <RefreshCw size={15} className={busy ? 'spin' : ''} /> Generate Schedule
                   </button>
-                  <button className="btn primary" onClick={() => setModal('availability')}>
-                    <Plus size={16} /> Add Focus Window
-                  </button>
+                  <QuickAddDropdown
+                    onAddTask={() => setModal('task')}
+                    onAddAvailability={() => setModal('availability')}
+                    onGeneratePlan={() => generate(false)}
+                    onAddSubject={() => setModal('subject')}
+                    onAnalyzeSyllabus={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
+                    busy={busy}
+                  />
                 </>
               )}
 
@@ -1343,13 +1543,27 @@ export default function App() {
                     <FileText size={15} />
                     <span>Syllabus AI Analyzer</span>
                   </button>
-                  <button className="btn primary" onClick={() => setModal('subject')}>
-                    <Plus size={16} /> Add Subject
-                  </button>
+                  <QuickAddDropdown
+                    onAddTask={() => setModal('task')}
+                    onAddAvailability={() => setModal('availability')}
+                    onGeneratePlan={() => generate(false)}
+                    onAddSubject={() => setModal('subject')}
+                    onAnalyzeSyllabus={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
+                    busy={busy}
+                  />
                 </>
               )}
 
-              {page === 'Insights' && null}
+              {page === 'Insights' && (
+                <QuickAddDropdown
+                  onAddTask={() => setModal('task')}
+                  onAddAvailability={() => setModal('availability')}
+                  onGeneratePlan={() => generate(false)}
+                  onAddSubject={() => setModal('subject')}
+                  onAnalyzeSyllabus={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
+                  busy={busy}
+                />
+              )}
             </div>
           </div>
 
@@ -1364,23 +1578,6 @@ export default function App() {
                 <X size={16} />
               </button>
             </div>
-          )}
-
-          {/* Smart Onboarding & Adaptive Study Assistant Banner */}
-          {(page === 'Overview' || page === 'Schedule' || page === 'Availability') && (
-            <SmartStudyGuide
-              availability={availability}
-              tasks={tasks}
-              schedule={schedule}
-              upcomingSessions={upcoming}
-              onOpenAvailabilityModal={() => setModal('availability')}
-              onOpenTaskModal={() => setModal('task')}
-              onOpenSyllabusModal={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
-              onGenerateSchedule={() => generate(false)}
-              onNavigate={(targetPage) => setPage(targetPage)}
-              onAddPresetAvailability={addPresetAvailability}
-              busy={busy}
-            />
           )}
 
           {/* PAGE: OVERVIEW */}
@@ -1634,79 +1831,6 @@ export default function App() {
                   )}
                 </section>
               </div>
-
-              {/* Quick Actions */}
-              <section className="panel quick-panel">
-                <div className="panel-head">
-                  <div>
-                    <span className="eyebrow">QUICK ACTIONS</span>
-                    <h3>Prepare Your Schedule</h3>
-                  </div>
-                </div>
-
-                <div className="quick-grid">
-                  <button className="quick-action" onClick={() => setModal('task')}>
-                    <div className="quick-icon">
-                      <Plus size={19} />
-                    </div>
-                    <div>
-                      <strong>Add a Task</strong>
-                      <span>Capture topics, assignments & exams</span>
-                    </div>
-                    <ArrowUpRight className="quick-arrow" size={16} />
-                  </button>
-
-                  <button
-                    className="quick-action"
-                    onClick={() => setPage('Availability')}
-                  >
-                    <div className="quick-icon">
-                      <Clock3 size={19} />
-                    </div>
-                    <div>
-                      <strong>Set Availability</strong>
-                      <span>Reserve blocks for focused work</span>
-                    </div>
-                    <ArrowUpRight className="quick-arrow" size={16} />
-                  </button>
-
-                  <button className="quick-action" onClick={() => generate(false)}>
-                    <div className="quick-icon">
-                      <RefreshCw size={19} />
-                    </div>
-                    <div>
-                      <strong>Generate Plan</strong>
-                      <span>Auto-slot tasks into study calendar</span>
-                    </div>
-                    <ArrowUpRight className="quick-arrow" size={16} />
-                  </button>
-
-                  <button className="quick-action" onClick={() => setModal('subject')}>
-                    <div className="quick-icon">
-                      <BookOpen size={19} />
-                    </div>
-                    <div>
-                      <strong>Add Subject</strong>
-                      <span>Organize your syllabus with colors</span>
-                    </div>
-                    <ArrowUpRight className="quick-arrow" size={16} />
-                  </button>
-
-                  <button
-                    className="quick-action"
-                    onClick={() => setSyllabusModal({ isOpen: true, subject: null, syllabus: null })}
-                  >
-                    <div className="quick-icon">
-                      <Sparkles size={19} />
-                    </div>
-                    <div>
-                      <strong>Analyze Syllabus</strong>
-                      <span>Extract & summarize topics by unit</span>
-                    </div>
-                    <ArrowUpRight className="quick-arrow" size={16} />
-                  </button>
-                </div>
-              </section>
             </>
           )}
 
@@ -2354,6 +2478,19 @@ export default function App() {
           </form>
         </Modal>
       )}
+
+      {/* Gamified Study Streak Cockpit Widget */}
+      <StreakCalendarModal
+        isOpen={showStreakModal}
+        onClose={() => setShowStreakModal(false)}
+        tasks={tasks}
+        schedule={schedule}
+        hasActiveTimer={Boolean(activeTimerSession)}
+        onNavigateToTasks={() => {
+          setShowStreakModal(false);
+          setPage('My tasks');
+        }}
+      />
 
       {/* Toast Notification */}
       {toast && (
