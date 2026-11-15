@@ -67,7 +67,7 @@ export default function TasksView({
       {
         id: 'pending',
         title: 'To Do / Pending',
-        color: '#8b7cff',
+        color: '#f97316',
         tasks: filteredTasks.filter((t) => t.status === 'pending')
       },
       {
@@ -98,7 +98,7 @@ export default function TasksView({
 
   const getSubjectColor = (subjectId) => {
     const s = subjects.find((x) => x._id === subjectId);
-    return s?.color || '#8b7cff';
+    return s?.color || '#f97316';
   };
 
   const moveStatus = (task, newStatus) => {

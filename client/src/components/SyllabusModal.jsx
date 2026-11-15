@@ -164,7 +164,7 @@ export default function SyllabusModal({
   };
 
   const currentSubjectObj = subjects.find((s) => s._id === selectedSubjectId) || subject;
-  const color = currentSubjectObj?.color || '#8b7cff';
+  const color = currentSubjectObj?.color || '#f97316';
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

@@ -339,7 +339,7 @@ export default function SubjectsView({
           ) : (
             <div className="subjects-cards-grid">
               {filteredSubjects.map((sub) => {
-                const color = sub.color || '#8b7cff';
+                const color = sub.color || '#f97316';
 
                 return (
                   <div

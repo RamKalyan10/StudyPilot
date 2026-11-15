@@ -65,7 +65,7 @@ export default function StudyTimer({
   if (!activeSession) return null;
 
   const subject = subjects.find((s) => s.name === activeSession.subjectName);
-  const color = subject?.color || '#8b7cff';
+  const color = subject?.color || '#f97316';
 
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;

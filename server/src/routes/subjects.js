@@ -43,7 +43,7 @@ router.post(
     const subject = await Subject.create({
       user: req.user._id,
       name: req.body.name.trim(),
-      color: req.body.color || '#8b7cff',
+      color: req.body.color || '#f97316',
       semester: req.body.semester || ''
     });
 

@@ -214,7 +214,7 @@ export default function CalendarView({
   // Find subject color
   const getSubjectColor = (subjectName) => {
     const s = subjects.find((x) => x.name === subjectName);
-    return s?.color || '#8b7cff';
+    return s?.color || '#f97316';
   };
 
   return (

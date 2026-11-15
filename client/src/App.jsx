@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState, useRef } from 'react';
 import {
+  Menu,
   Compass,
   LayoutDashboard,
   CalendarDays,
@@ -71,7 +72,7 @@ const dateInput = (date = new Date()) => {
 };
 
 const COLOR_PALETTE = [
-  { name: 'Royal Purple', hex: '#8b7cff' },
+  { name: 'Pilot Orange', hex: '#f97316' },
   { name: 'Electric Sky', hex: '#38bdf8' },
   { name: 'Emerald Mint', hex: '#34d399' },
   { name: 'Warm Amber', hex: '#fb923c' },
@@ -637,6 +638,16 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [page, setPage] = useState('Overview');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setMobileNavOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -691,7 +702,7 @@ export default function App() {
   const [subjectForm, setSubjectForm] = useState({
     name: '',
     semester: '',
-    color: '#8b7cff',
+    color: '#f97316',
     syllabusText: '',
     syllabusFileName: ''
   });
@@ -844,7 +855,7 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify(subjectForm)
       });
-      setSubjectForm({ name: '', semester: '', color: '#8b7cff', syllabusText: '', syllabusFileName: '' });
+      setSubjectForm({ name: '', semester: '', color: '#f97316', syllabusText: '', syllabusFileName: '' });
       setShowSyllabusInput(false);
       setSubjectDocMeta(null);
       setSubjectDocError('');
@@ -856,7 +867,7 @@ export default function App() {
     await act(async () => {
       await api('/subjects', {
         method: 'POST',
-        body: JSON.stringify({ name, semester: semester || '', color: color || '#8b7cff' })
+        body: JSON.stringify({ name, semester: semester || '', color: color || '#f97316' })
       });
     }, `Subject "${name}" added to your workspace!`);
   }
@@ -1034,15 +1045,33 @@ export default function App() {
   ];
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      {/* Mobile Drawer Backdrop */}
+      {mobileNavOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${mobileNavOpen ? 'mobile-open' : ''}`}>
         <div className="brand">
           <div className="brand-icon">
             <Compass />
           </div>
           <span>StudyPilot</span>
           <span className="brand-dot">.</span>
+          <button
+            type="button"
+            className="mobile-sidebar-close"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Close navigation menu"
+            title="Close menu"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <div className="workspace-label">STUDY WORKSPACE</div>
@@ -1060,7 +1089,10 @@ export default function App() {
               <button
                 key={n.label}
                 className={`nav-item ${page === n.label ? 'active' : ''}`}
-                onClick={() => setPage(n.label)}
+                onClick={() => {
+                  setPage(n.label);
+                  setMobileNavOpen(false);
+                }}
               >
                 <n.icon size={18} />
                 <span>{n.label}</span>
@@ -1158,8 +1190,26 @@ export default function App() {
       {/* Main Content Area */}
       <main className="main-area">
         <header className="topbar">
-          <div className="breadcrumb">
-            Workspace <span>/</span> <strong>{page}</strong>
+          <div className="topbar-left">
+            <button
+              type="button"
+              className="hamburger-btn"
+              onClick={() => {
+                if (window.innerWidth <= 1024) {
+                  setMobileNavOpen((prev) => !prev);
+                } else {
+                  setSidebarCollapsed((prev) => !prev);
+                }
+              }}
+              aria-label="Toggle navigation menu"
+              title="Toggle navigation"
+            >
+              <Menu size={20} />
+            </button>
+
+            <div className="breadcrumb">
+              Workspace <span>/</span> <strong>{page}</strong>
+            </div>
           </div>
 
           <div className="topbar-right">
