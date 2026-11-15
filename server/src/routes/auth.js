@@ -23,13 +23,13 @@ import { verifyFirebaseIdToken } from '../services/firebaseAuth.js';
 const router = Router();
 
 /**
- * Helper to generate a 7-day signed JWT.
+ * Helper to generate a 3-day signed JWT.
  *
  * @param {Object} user - User document
  * @returns {string} Signed JWT
  */
 const signToken = (user) =>
-  jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  jwt.sign({ sub: user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '3d' });
 
 /**
  * Standardizes user payload returned to client.

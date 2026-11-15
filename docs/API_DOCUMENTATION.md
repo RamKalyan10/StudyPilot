@@ -8,7 +8,7 @@ All endpoints are hosted relative to the `/api` prefix (e.g. `http://localhost:5
 
 - **Mechanism**: JSON Web Tokens (JWT).
 - **Header Format**: `Authorization: Bearer <token>`
-- **Token Validity**: 7 days.
+- **Token Validity**: 3 days.
 - **Rate Limiting**: `/api/auth/*` is limited to **100 requests per 15 minutes** per IP.
 
 ---
